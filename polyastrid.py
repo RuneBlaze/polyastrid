@@ -8,6 +8,7 @@ import json
 import argparse
 import asterid as ad
 import asterid as astrid
+from polybase import *
 import os
 
 __location__ = os.path.realpath(
@@ -22,17 +23,7 @@ for i in range(3):
     correction_map[i] = 0
 
 # if branch support are percentages, convert them to probabilities
-def normalize(trees):
-    maximum_value = 1
-    for t in trees:
-        for n in t.traverse_internal():
-            if n.label:
-                maximum_value = max(maximum_value, float(n.label))
-    if maximum_value > 1:
-        for t in trees:
-            for n in t.traverse_internal():
-                if n.label:
-                    n.label = float(n.label) / 100
+
 def degree(node):
     return (1 if not node.is_root() else 0) + node.num_children()
 
@@ -73,33 +64,6 @@ def get_distance(tree, ts2int):
             D[ts2int[u], ts2int[n.label]] = d
     return D
 
-def all_matrices(ts, trees):
-    return [ad.DistanceMatrix(ts, t) for t in trees]
-
-def taxon_pairs(ts):
-    for i in range(len(ts)):
-        for j in range(i, len(ts)):
-            yield i, j
-
-def matrix_elementwise(ts, Ds, f):
-    R = ad.DistanceMatrix(ts)
-    for i, j in taxon_pairs(ts):
-        if i == j:
-            R[i, j] = 0
-            R.setmask((i, j), len(Ds))
-            continue
-        l = []
-        for D in Ds:
-            if D.has(i, j):
-                l.append(D[i, j])
-        if l:
-            R[i, j] = f(l)
-            R.setmask((i, j), len(l))
-        else:
-            R[i, j] = 0
-            R.setmask((i, j), 0)
-    return R
-
 def build_D(trees):
     taxons = ad.get_ts(trees)
     Ds = all_matrices(taxons, trees)
@@ -107,7 +71,6 @@ def build_D(trees):
     ts2int = get_ts_mapping(tsw_trees[0])
     for k in range(len(trees)):
         DM = get_distance(tsw_trees[k], ts2int)
-        # print(DM.sum())
         D = Ds[k]
         for i, j in taxon_pairs(taxons):
             iname, jname = taxons[i], taxons[j]
@@ -127,44 +90,19 @@ def get_ts_mapping(tree):
         result[t.label] = i
     return result
 
-def monte_carlo_contract(tree_):
-    tree = copy(tree_)
-    to_contract = []
-    for n in tree.traverse_internal():
-        if n.is_root():
-            continue
-        if random() < (1 - float(n.label)):
-            to_contract.append(n)
-    for n in to_contract:
-        n.contract()
-    return tree
-
-def run_iterations(ts, D, methods):
-    fns = {
-        "u": lambda ts, D: astrid.upgma_star(ts, D) + ";",
-        "f": lambda ts, D: astrid.fastme_balme(ts, D, 0, 0),
-        "n": lambda ts, D: astrid.fastme_balme(ts, D, 1, 0),
-        "s": lambda ts, D: astrid.fastme_balme(ts, D, 1, 1),
-        "j": lambda ts, D: astrid.fastme_nj(ts, D, 0, 0),
-        "N": lambda ts, D: astrid.fastme_nj(ts, D, 1, 0),
-        "S": lambda ts, D: astrid.fastme_nj(ts, D, 1, 1),
-    }
-    t = None
-    for m in methods:
-        if m not in fns:
-            raise f"{m} not found as a method!"
-        f = fns[m]
-        t = f(ts, D)
-        D.fill_in_transient(ts, t)
-    return t
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required = True)
+    parser.add_argument('-m', '--montecarlo', type=int, default = 0)
     parser.add_argument('-o', '--output', type=str, default = "-")
 
     args = parser.parse_args()
     trees = open(args.input, "r").readlines()
+    ts_trees = [ts.read_tree_newick(t) for t in trees]
+    normalize(ts_trees)
+    if args.montecarlo > 0:
+        trees = explode(ts_trees, args.montecarlo)
     taxa, D = build_D(trees)
     T = run_iterations(taxa, D, "s")
     if args.output == "-":
