@@ -10,7 +10,7 @@ import asterid as ad
 import asterid as astrid
 import os
 
-def normalize(trees):
+def normalize(trees, mabayes = False):
     maximum_value = 1
     for t in trees:
         for n in t.traverse_internal():
@@ -21,6 +21,11 @@ def normalize(trees):
             for n in t.traverse_internal():
                 if n.label:
                     n.label = float(n.label) / 100
+    if mabayes:
+        for t in trees:
+            for n in t.traverse_internal():
+                if n.label:
+                    n.label = (float(n.label) * 2 + 1) / 3
 
 def all_matrices(ts, trees):
     return [ad.DistanceMatrix(ts, t) for t in trees]
