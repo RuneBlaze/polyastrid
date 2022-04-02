@@ -1,5 +1,6 @@
 from copy import copy
 from math import fsum
+from joblib import Parallel, delayed
 from random import random
 import treeswift as ts
 import numpy as np
@@ -66,11 +67,12 @@ def get_distance(tree, ts2int):
 
 def build_D(trees):
     taxons = ad.get_ts(trees)
-    Ds = all_matrices(taxons, trees)
     tsw_trees = [ts.read_tree_newick(t) for t in trees]
     ts2int = get_ts_mapping(tsw_trees[0])
+    DMs = Parallel(n_jobs=-1)(delayed(get_distance)(tsw_trees[k], ts2int) for k in range(len(trees)))
+    Ds = all_matrices(taxons, trees)
     for k in range(len(trees)):
-        DM = get_distance(tsw_trees[k], ts2int)
+        DM = DMs[k]
         D = Ds[k]
         for i, j in taxon_pairs(taxons):
             iname, jname = taxons[i], taxons[j]
@@ -95,12 +97,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required = True)
     parser.add_argument('-m', '--montecarlo', type=int, default = 0)
+    parser.add_argument('--renormalize', action='store_true')
     parser.add_argument('-o', '--output', type=str, default = "-")
 
     args = parser.parse_args()
     trees = open(args.input, "r").readlines()
     ts_trees = [ts.read_tree_newick(t) for t in trees]
-    normalize(ts_trees)
+    normalize(ts_trees, args.renormalize)
     if args.montecarlo > 0:
         trees = explode(ts_trees, args.montecarlo)
     taxa, D = build_D(trees)

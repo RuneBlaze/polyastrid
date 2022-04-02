@@ -25,7 +25,7 @@ def normalize(trees, mabayes = False):
         for t in trees:
             for n in t.traverse_internal():
                 if n.label:
-                    n.label = (float(n.label) * 2 + 1) / 3
+                    n.label = (float(n.label) - 0.333) * 3 / 2
 
 def all_matrices(ts, trees):
     return [ad.DistanceMatrix(ts, t) for t in trees]
