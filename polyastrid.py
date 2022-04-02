@@ -9,6 +9,7 @@ import json
 import argparse
 import asterid as ad
 import asterid as astrid
+import time
 from polybase import *
 import os
 
@@ -106,8 +107,14 @@ if __name__ == '__main__':
     ts_trees = [ts.read_tree_newick(t) for t in trees]
     normalize(ts_trees, args.renormalize)
     if args.montecarlo > 0:
+        start = time.time()
         trees = explode(ts_trees, args.montecarlo)
+        end = time.time()
+        print(f"Exploded all trees in {end - start} seconds")
+    start = time.time()
     taxa, D = build_D(trees, args.cores)
+    end = time.time()
+    print(f"Built the distance matrix in {end - start} seconds")
     T = run_iterations(taxa, D, "s")
     if args.output == "-":
         print(T)
