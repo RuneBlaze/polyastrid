@@ -66,11 +66,14 @@ def get_distance(tree, ts2int):
             D[ts2int[u], ts2int[n.label]] = d
     return D
 
+def get_distance_from_newick(tree, ts2int):
+    return get_distance(ts.read_tree_newick(tree), ts2int)
+
 def build_D(trees, n_jobs = -1):
     taxons = ad.get_ts(trees)
-    tsw_trees = [ts.read_tree_newick(t) for t in trees]
-    ts2int = get_ts_mapping(tsw_trees[0])
-    DMs = Parallel(n_jobs=n_jobs)(delayed(get_distance)(tsw_trees[k], ts2int) for k in range(len(trees)))
+    # tsw_trees = [ for t in trees]
+    ts2int = get_ts_mapping(ts.read_tree_newick(trees[0]))
+    DMs = Parallel(n_jobs=n_jobs)(delayed(get_distance_from_newick)(trees[k], ts2int) for k in range(len(trees)))
     Ds = all_matrices(taxons, trees)
     for k in range(len(trees)):
         DM = DMs[k]
