@@ -65,11 +65,11 @@ def get_distance(tree, ts2int):
             D[ts2int[u], ts2int[n.label]] = d
     return D
 
-def build_D(trees):
+def build_D(trees, n_jobs = -1):
     taxons = ad.get_ts(trees)
     tsw_trees = [ts.read_tree_newick(t) for t in trees]
     ts2int = get_ts_mapping(tsw_trees[0])
-    DMs = Parallel(n_jobs=-1)(delayed(get_distance)(tsw_trees[k], ts2int) for k in range(len(trees)))
+    DMs = Parallel(n_jobs=n_jobs)(delayed(get_distance)(tsw_trees[k], ts2int) for k in range(len(trees)))
     Ds = all_matrices(taxons, trees)
     for k in range(len(trees)):
         DM = DMs[k]
@@ -98,6 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--input', type=str, required = True)
     parser.add_argument('-m', '--montecarlo', type=int, default = 0)
     parser.add_argument('--renormalize', action='store_true')
+    parser.add_argument('-c', '--cores', type=int, default = -1)
     parser.add_argument('-o', '--output', type=str, default = "-")
 
     args = parser.parse_args()
@@ -106,7 +107,7 @@ if __name__ == '__main__':
     normalize(ts_trees, args.renormalize)
     if args.montecarlo > 0:
         trees = explode(ts_trees, args.montecarlo)
-    taxa, D = build_D(trees)
+    taxa, D = build_D(trees, args.cores)
     T = run_iterations(taxa, D, "s")
     if args.output == "-":
         print(T)
