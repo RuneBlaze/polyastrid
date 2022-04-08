@@ -9,6 +9,7 @@ import argparse
 import asterid as ad
 import asterid as astrid
 import os
+from math import exp
 
 def normalize(trees, mabayes = False):
     maximum_value = 1
@@ -36,13 +37,18 @@ def taxon_pairs(ts):
             yield i, j
 
 
-def monte_carlo_contract(tree_):
+def monte_carlo_contract(tree_, mode):
     tree = copy(tree_)
     to_contract = []
+    considered_one_part = False
     for n in tree.traverse_internal():
-        if n.is_root() or n.label == '':
+        if n.is_root() or n.label == '' or not n.label:
             continue
-        if random() < (1 - float(n.label)):
+        if considered_one_part and n.parent.num_children() == 2:
+            continue
+        if n.parent.num_children() == 2:
+            considered_one_part = True
+        if random() < (1 - calc_weight(n, mode)):
             to_contract.append(n)
     for n in to_contract:
         n.contract()
@@ -89,13 +95,33 @@ def matrix_elementwise(ts, Ds, f):
 def to_newick(tree):
     T = tree.newick()
     if '[&R]' in T:
-        T = T.replace('[&R]', '')
+        T = T.replace('[&R]', '', 1)
     T = T.strip()
     return T
 
-def explode(trees, factor):
+def explode(trees, factor, mode = 's'):
     results = []
     for t in trees:
         for _ in range(factor):
-            results.append(to_newick(monte_carlo_contract(t)))
+            results.append(to_newick(monte_carlo_contract(t, mode)))
     return results
+
+def calc_support(node):
+    if node.is_leaf():
+        return 1
+    if not node.label:
+        return 0
+    return float(node.label)
+
+def calc_length(node):
+    if node.parent.is_root() and node.parent.num_children() == 2:
+        return sum(c.edge_length for c in node.parent.children)
+    return node.edge_length
+
+def calc_weight(node, mode = "s"):
+    if mode == "s":
+        return calc_support(node)
+    if mode == "l":
+        return 1 - exp(-calc_length(node))
+    if mode == "h":
+        return calc_weight(node, "s") * calc_weight(node, "l")

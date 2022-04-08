@@ -16,7 +16,7 @@ import os
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-with open(os.path.join(__location__,"probs.json")) as fh: correction_map_ = json.load(fh)
+with open(os.path.join(__location__, "probs.json")) as fh: correction_map_ = json.load(fh)
 
 correction_map = {}
 for k in correction_map_:
@@ -96,11 +96,11 @@ def get_ts_mapping(tree):
         result[t.label] = i
     return result
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, required = True)
     parser.add_argument('-m', '--montecarlo', type=int, default = 0)
+    parser.add_argument('-w', '--weighting', type=str, default = 's')
     parser.add_argument('--renormalize', action='store_true')
     parser.add_argument('-c', '--cores', type=int, default = -1)
     parser.add_argument('-o', '--output', type=str, default = "-")
@@ -111,7 +111,7 @@ if __name__ == '__main__':
     normalize(ts_trees, args.renormalize)
     if args.montecarlo > 0:
         start = time.time()
-        trees = explode(ts_trees, args.montecarlo)
+        trees = explode(ts_trees, args.montecarlo, args.weighting)
         end = time.time()
         print(f"Exploded all trees in {end - start} seconds")
     start = time.time()
@@ -124,16 +124,3 @@ if __name__ == '__main__':
     else:
         with open(args.output, "w+") as fh:
             fh.write(T)
-# trees = []
-# with open("avian.tre") as fh:
-#     for l in fh:
-#         trees.append(ts.read_tree_newick(l))
-# normalize(trees)
-# for i in range(10):
-#     tree = monte_carlo_contract(trees[0])
-#     print(tree.newick())
-#     ts = get_ts_mapping(tree)
-#     D = get_distance(tree, ts)
-#     print(ts)
-#     print(D)
-#     print(D.sum()/2)
