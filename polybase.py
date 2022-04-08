@@ -119,6 +119,8 @@ def calc_length(node):
     return node.edge_length
 
 def calc_weight(node, mode = "s"):
+    if mode == 'i':
+        return 1
     if mode == "s":
         return calc_support(node)
     if mode == "l":
