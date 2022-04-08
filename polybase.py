@@ -129,4 +129,6 @@ def calc_weight(node, mode = "s"):
         return calc_weight(node, "s") * calc_weight(node, "l")
     if mode == "h2":
         s = calc_support(node)
+        # print(s)
+        # print(1 - (1 - s) * exp(-calc_length(node)))
         return 1 - (1 - s) * exp(-calc_length(node))
