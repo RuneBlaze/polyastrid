@@ -27,6 +27,16 @@ def normalize(trees, mabayes = False):
             for n in t.traverse_internal():
                 if n.label:
                     n.label = (float(n.label) - 0.333) * 3 / 2
+    # for t in trees:
+    #     if t.root.num_children() == 2:
+    #         support = -1
+    #         for c in t.root.children:
+    #             if c.is_leaf():
+    #                 support = 1
+    #             elif c.label:
+    #                 support = max(support, float(c.label))
+    #         for c in t.root.children:
+    #             c.label = support
 
 def all_matrices(ts, trees):
     return [ad.DistanceMatrix(ts, t) for t in trees]
@@ -109,7 +119,15 @@ def explode(trees, factor, mode = 's'):
 def calc_support(node):
     if node.is_leaf():
         return 1
+    if node.parent.is_root() and node.parent.num_children() == 2 and not node.label:
+        for c in node.parent.children:
+            if c.label and not c.is_leaf():
+                return float(c.label)
+            if c.is_leaf():
+                return 1
     if not node.label:
+        print(node.parent.is_root() and node.parent.num_children() == 2)
+        assert False
         return 0
     return float(node.label)
 

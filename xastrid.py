@@ -8,7 +8,6 @@ def postprocess(length, weight, mode):
         return (1 - exp(-length)) * weight
 
 def all_pairs_matrix(tree, ts2int, mode, postprocessing):
-    # M = dict()
     N = len(ts2int)
     D = np.zeros((N, N))
     leaf_dists = dict()
@@ -22,8 +21,7 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing):
                     if node.is_root() and node.num_children() == 2:
                         if calculated_root:
                             continue
-                        else:
-                            calculated_root = True
+                        calculated_root = True
                     for i in range(len(leaf_dists[c])):
                         u, v = leaf_dists[c][i][1]
                         leaf_dists[c][i][1] = (u + calc_length(c), v + calc_weight(c, mode))
@@ -145,7 +143,7 @@ if __name__ == '__main__':
     trees = open(args.input, "r").readlines()
     ts_trees = [ts.read_tree_newick(t) for t in trees]
     normalize(ts_trees)
-    taxa, D = build_D([to_newick(t) for t in ts_trees], args.weighting, args.postprocessing)
+    taxa, D = build_D2([to_newick(t) for t in ts_trees], args.weighting, args.postprocessing)
     T = run_iterations(taxa, D, "s")
     if args.output == "-":
         print(T)
