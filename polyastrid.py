@@ -69,11 +69,68 @@ def get_distance(tree, ts2int):
 def get_distance_from_newick(tree, ts2int):
     return get_distance(ts.read_tree_newick(tree), ts2int)
 
+def all_pairs_matrix(tree_, ts2int):
+    tree = ts.read_tree_newick(tree_)
+    N = len(ts2int)
+    D = np.zeros((N, N))
+    leaf_dists = dict()
+    for node in tree.traverse_postorder():
+        if node.is_leaf():
+            leaf_dists[node] = [[node,0]]
+        else:
+            calculated_root = False
+            for c in node.children:
+                if c.edge_length is not None:
+                    if node.is_root() and node.num_children() == 2:
+                        if calculated_root:
+                            continue
+                        calculated_root = True
+                    for i in range(len(leaf_dists[c])):
+                        l = leaf_dists[c][i][1]
+                        leaf_dists[c][i][1] = l + 1 + correction_map[degree(node)]
+            for c1 in range(0,len(node.children)-1):
+                leaves_c1 = leaf_dists[node.children[c1]]
+                for c2 in range(c1+1,len(node.children)):
+                    leaves_c2 = leaf_dists[node.children[c2]]
+                    for i in range(len(leaves_c1)):
+                        for j in range(len(leaves_c2)):
+                            u, d1 = leaves_c1[i]
+                            v, d2 = leaves_c2[j]
+                            d = d1 + d2 + correction_map[degree(node)]
+                            u_key = u.label
+                            v_key = v.label
+                            estimated = d
+                            D[ts2int[u_key], ts2int[v_key]] = estimated
+                            D[ts2int[v_key], ts2int[u_key]] = estimated
+            leaf_dists[node] = leaf_dists[node.children[0]]; del leaf_dists[node.children[0]]
+            for i in range(1,len(node.children)):
+                leaf_dists[node] += leaf_dists[node.children[i]]; del leaf_dists[node.children[i]]
+    return D
+
 def build_D(trees, n_jobs = -1):
     taxons = ad.get_ts(trees)
     # tsw_trees = [ for t in trees]
     ts2int = get_ts_mapping(ts.read_tree_newick(trees[0]))
     DMs = Parallel(n_jobs=n_jobs)(delayed(get_distance_from_newick)(trees[k], ts2int) for k in range(len(trees)))
+    Ds = all_matrices(taxons, trees)
+    for k in range(len(trees)):
+        DM = DMs[k]
+        D = Ds[k]
+        for i, j in taxon_pairs(taxons):
+            iname, jname = taxons[i], taxons[j]
+            if i == j:
+                D[i, j] = 0
+                D.setmask((i, j), 1)
+                continue
+            D[i, j] = DM[ts2int[iname], ts2int[jname]]
+            D.setmask((i, j), 1)
+    return taxons, matrix_elementwise(taxons, Ds, np.mean)
+
+def build_D2(trees, n_jobs = -1):
+    taxons = ad.get_ts(trees)
+    # tsw_trees = [ for t in trees]
+    ts2int = get_ts_mapping(ts.read_tree_newick(trees[0]))
+    DMs = Parallel(n_jobs=n_jobs)(delayed(all_pairs_matrix)(trees[k], ts2int) for k in range(len(trees)))
     Ds = all_matrices(taxons, trees)
     for k in range(len(trees)):
         DM = DMs[k]

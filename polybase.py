@@ -46,6 +46,8 @@ def taxon_pairs(ts):
         for j in range(i, len(ts)):
             yield i, j
 
+def is_fake_node(node):
+    return node.num_children() == 2 and node.is_root()
 
 def monte_carlo_contract(tree_, mode):
     tree = copy(tree_)
@@ -54,11 +56,11 @@ def monte_carlo_contract(tree_, mode):
     for n in tree.traverse_internal():
         if n.is_root() or n.label == '' or not n.label:
             continue
-        if considered_one_part and n.parent.num_children() == 2:
+        if considered_one_part and is_fake_node(n.parent):
             continue
-        if n.parent.num_children() == 2:
+        if is_fake_node(n.parent):
             considered_one_part = True
-        if random() < (1 - calc_weight(n, mode)):
+        if random() > calc_weight(n, mode):
             to_contract.append(n)
     for n in to_contract:
         n.contract()
@@ -119,14 +121,14 @@ def explode(trees, factor, mode = 's'):
 def calc_support(node):
     if node.is_leaf():
         return 1
-    if node.parent.is_root() and node.parent.num_children() == 2 and not node.label:
+    if is_fake_node(node.parent) and not node.label:
         for c in node.parent.children:
             if c.label and not c.is_leaf():
                 return float(c.label)
-            if c.is_leaf():
+            elif c.is_leaf():
                 return 1
     if not node.label:
-        print(node.parent.is_root() and node.parent.num_children() == 2)
+        # print(is_fake_node(node.parent)
         assert False
         return 0
     return float(node.label)
@@ -147,8 +149,6 @@ def calc_weight(node, mode = "s"):
         return calc_weight(node, "s") * calc_weight(node, "l")
     if mode == "h2":
         s = calc_support(node)
-        # print(s)
-        # print(1 - (1 - s) * exp(-calc_length(node)))
         return 1 - (1 - s) * exp(-calc_length(node))
     if mode == "hu":
         s = calc_support(node)
