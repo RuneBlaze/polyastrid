@@ -133,7 +133,7 @@ def import_trees(path):
     trees = open(path, "r").readlines()
     ts_trees = [ts.read_tree_newick(t) for t in trees]
     normalize(ts_trees)
-    return ts_trees
+    return [to_newick(t) for t in ts_trees]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

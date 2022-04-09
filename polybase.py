@@ -132,3 +132,6 @@ def calc_weight(node, mode = "s"):
         # print(s)
         # print(1 - (1 - s) * exp(-calc_length(node)))
         return 1 - (1 - s) * exp(-calc_length(node))
+    if mode == "hu":
+        s = calc_support(node)
+        return max(0, s - exp(-calc_length(node)))
