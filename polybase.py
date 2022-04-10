@@ -9,6 +9,7 @@ import argparse
 import asterid as ad
 import asterid as astrid
 import os
+import sys
 from math import exp
 
 def normalize(trees, mabayes = False):
@@ -128,9 +129,7 @@ def calc_support(node):
             elif c.is_leaf():
                 return 1
     if not node.label:
-        # print(is_fake_node(node.parent)
-        assert False
-        return 0
+        return 1 # turns out aBayes does attribute things so we might need to impute missing data
     return float(node.label)
 
 def calc_length(node):
