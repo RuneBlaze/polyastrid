@@ -129,7 +129,7 @@ def calc_support(node):
             elif c.is_leaf():
                 return 1
     if not node.label:
-        return 1 # turns out aBayes does attribute things so we might need to impute missing data
+        return 0 # turns out aBayes does attribute things so we might need to impute missing data
     return float(node.label)
 
 def calc_length(node):
