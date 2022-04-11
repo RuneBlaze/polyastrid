@@ -14,6 +14,8 @@ from math import exp
 
 def normalize_length(tree, normalize_leaf):
     max_length = max(calc_length(n) for n in tree.traverse_internal() if not n.is_root())
+    if max_length <= 0:
+        return
     for n in tree.traverse_internal():
         if n.is_root():
             continue
