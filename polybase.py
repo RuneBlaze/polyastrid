@@ -180,6 +180,10 @@ def calc_weight(node, mode = "s"):
         return 1 - exp(-calc_length(node))
     if mode == "L":
         return calc_length(node) # this is dumb
+    if mode == "H":
+        return calc_length(node) * calc_support(node)
+    if mode == "H2":
+        return 1 - (1 - calc_length(node)) * (1 - calc_support(node))
     if mode == "h":
         return calc_weight(node, "s") * calc_weight(node, "l")
     if mode == "h2":
