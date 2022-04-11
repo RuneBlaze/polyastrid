@@ -139,11 +139,13 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--weighting', type=str, default = 's')
     parser.add_argument('-p', '--postprocessing', type=str, default = 'i')
     parser.add_argument('--renormalize', action='store_true')
+    parser.add_argument('--eachtree', action='store_true')
     parser.add_argument('-o', '--output', type=str, default = "-")
     args = parser.parse_args()
     trees = open(args.input, "r").readlines()
     ts_trees = [ts.read_tree_newick(t) for t in trees]
-    normalize(ts_trees, args.renormalize)
+    normalize(ts_trees, args.renormalize, args.eachtree)
+    # print(ts_trees[0].newick())
     taxa, D = build_D2([to_newick(t) for t in ts_trees], args.weighting, args.postprocessing)
     T = run_iterations(taxa, D, "s")
     if args.output == "-":

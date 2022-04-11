@@ -12,22 +12,54 @@ import os
 import sys
 from math import exp
 
-def normalize(trees, mabayes = False):
+def normalize_length(tree, normalize_leaf):
+    max_length = max(calc_length(n) for n in tree.traverse_internal() if not n.is_root())
+    for n in tree.traverse_internal():
+        if n.is_root():
+            continue
+        if n.edge_length:
+            n.edge_length = float(n.edge_length) / max_length
+    for n in tree.traverse_leaves():
+        if normalize_leaf:
+            n.edge_length = 1
+        else:
+            n.edge_length = float(n.edge_length) / max_length
+
+
+def normalize(trees, normalize_leaf = False, each_tree = False):
     maximum_value = 1
+    max_length = -1
     for t in trees:
         for n in t.traverse_internal():
             if n.label:
                 maximum_value = max(maximum_value, float(n.label))
+            if not n.is_root():
+                max_length = max(max_length, calc_length(n))
+    if max_length < 0:
+        assert False
+    if each_tree:
+        for t in trees:
+            normalize_length(t, normalize_leaf)
+    else:
+        for t in trees:
+            for n in t.traverse_internal():
+                if n.edge_length:
+                    n.edge_length = float(n.edge_length) / max_length
+            if normalize_leaf:
+                for n in t.traverse_leaves():
+                    n.edge_length = 1
+                else:
+                    n.edge_length = float(n.edge_length) / max_length
     if maximum_value > 1:
         for t in trees:
             for n in t.traverse_internal():
                 if n.label:
                     n.label = float(n.label) / 100
-    if mabayes:
-        for t in trees:
-            for n in t.traverse_internal():
-                if n.label:
-                    n.label = (float(n.label) - 0.333) * 3 / 2
+    # if mabayes:
+    #     for t in trees:
+    #         for n in t.traverse_internal():
+    #             if n.label:
+    #                 n.label = (float(n.label) - 0.333) * 3 / 2
     # for t in trees:
     #     if t.root.num_children() == 2:
     #         support = -1
@@ -144,6 +176,8 @@ def calc_weight(node, mode = "s"):
         return calc_support(node)
     if mode == "l":
         return 1 - exp(-calc_length(node))
+    if mode == "L":
+        return calc_length(node) # this is dumb
     if mode == "h":
         return calc_weight(node, "s") * calc_weight(node, "l")
     if mode == "h2":
