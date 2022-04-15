@@ -32,6 +32,8 @@ def normalization_factor(tree, ts2int, strategy):
 
 def normalize_tree(tree, ts2int, strategy, normalize_leaf):
     f = normalization_factor(tree, ts2int, strategy) * 0.5
+    if f <= 0:
+        return
     # print(f, normalize_leaf)
     for n in tree.traverse_internal():
         if n.is_root():
