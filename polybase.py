@@ -57,21 +57,6 @@ def normalize(trees, normalize_leaf = False, each_tree = False):
             for n in t.traverse_internal():
                 if n.label:
                     n.label = float(n.label) / 100
-    # if mabayes:
-    #     for t in trees:
-    #         for n in t.traverse_internal():
-    #             if n.label:
-    #                 n.label = (float(n.label) - 0.333) * 3 / 2
-    # for t in trees:
-    #     if t.root.num_children() == 2:
-    #         support = -1
-    #         for c in t.root.children:
-    #             if c.is_leaf():
-    #                 support = 1
-    #             elif c.label:
-    #                 support = max(support, float(c.label))
-    #         for c in t.root.children:
-    #             c.label = support
 
 def all_matrices(ts, trees):
     return [ad.DistanceMatrix(ts, t) for t in trees]
