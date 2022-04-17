@@ -91,7 +91,10 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing):
                             if postprocessing == "as":
                                 weight = l / (ub + vb)
                             elif postprocessing == "was":
-                                weight = l / estimated
+                                if estimated <= 0:
+                                    weight = 0
+                                else:
+                                    weight = l / estimated
                             tu = ts2int[u_key]
                             tv = ts2int[v_key]
                             D[tu, tv] = estimated
