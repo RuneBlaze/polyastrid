@@ -7,7 +7,7 @@ def normalization_factor(tree, ts2int, strategy):
     if strategy == "none":
         return 1
     if strategy.endswith("path"):
-        D = all_pairs_matrix(tree, ts2int, "L", "i")
+        D, _ = all_pairs_matrix(tree, ts2int, "L", "i")
         if strategy == "longest_path":
             return D.max() / (0.25 * N)
         if strategy == "longest_internal_path":
@@ -34,7 +34,6 @@ def normalize_tree(tree, ts2int, strategy, normalize_leaf):
     f = normalization_factor(tree, ts2int, strategy) * 0.5
     if f <= 0:
         return
-    # print(f, normalize_leaf)
     for n in tree.traverse_internal():
         if n.is_root():
             continue
@@ -55,10 +54,11 @@ def postprocess(prodsupp, weight, mode):
 def all_pairs_matrix(tree, ts2int, mode, postprocessing):
     N = len(ts2int)
     D = np.zeros((N, N))
+    W = np.zeros((N, N))
     leaf_dists = dict()
     for node in tree.traverse_postorder():
         if node.is_leaf():
-            leaf_dists[node] = [[node,(0, 0)]]
+            leaf_dists[node] = [[node,(0, 0, 0)]]
         else:
             calculated_root = False
             for c in node.children:
@@ -68,26 +68,40 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing):
                             continue
                         calculated_root = True
                     for i in range(len(leaf_dists[c])):
-                        u, v = leaf_dists[c][i][1]
-                        leaf_dists[c][i][1] = (u + 0, v + calc_weight(c, mode))
+                        dist, u, v = leaf_dists[c][i][1]
+                        u_acc = 0
+                        if postprocessing == "as":
+                            u_acc = calc_support(c)
+                        elif postprocessing == "was":
+                            u_acc = calc_support(c) * calc_length(c)
+                        leaf_dists[c][i][1] = (dist + 1, u + u_acc, v + calc_weight(c, mode))
             for c1 in range(0,len(node.children)-1):
                 leaves_c1 = leaf_dists[node.children[c1]]
                 for c2 in range(c1+1,len(node.children)):
                     leaves_c2 = leaf_dists[node.children[c2]]
                     for i in range(len(leaves_c1)):
                         for j in range(len(leaves_c2)):
-                            u, (ul, ud) = leaves_c1[i]
-                            v, (vl, vd) = leaves_c2[j]
+                            u, (ub, ul, ud) = leaves_c1[i]
+                            v, (vb, vl, vd) = leaves_c2[j]
                             l, d = (ul + vl, ud + vd)
                             u_key = u.label
                             v_key = v.label
-                            estimated = postprocess(exp(l), d, postprocessing)
-                            D[ts2int[u_key], ts2int[v_key]] = estimated
-                            D[ts2int[v_key], ts2int[u_key]] = estimated
+                            estimated = d
+                            weight = 1
+                            if postprocessing == "as":
+                                weight = l / (ub + vb)
+                            elif postprocessing == "was":
+                                weight = l / estimated
+                            tu = ts2int[u_key]
+                            tv = ts2int[v_key]
+                            D[tu, tv] = estimated
+                            D[tv, tu] = estimated
+                            W[tu, tv] = weight
+                            W[tv, tu] = weight
             leaf_dists[node] = leaf_dists[node.children[0]]; del leaf_dists[node.children[0]]
             for i in range(1,len(node.children)):
                 leaf_dists[node] += leaf_dists[node.children[i]]; del leaf_dists[node.children[i]]
-    return D
+    return D, W
 
 def dfs(l, mode = "s", postprocessing = "i"):
     # state: (leaf, (total length, total weight))
@@ -139,13 +153,15 @@ def get_ts_mapping(tree):
 def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
     taxons = ad.get_ts(trees)
     Ds = all_matrices(taxons, trees)
+    Ws = all_matrices(taxons, trees)
     tsw_trees = [ts.read_tree_newick(t) for t in trees]
     ts2int = get_ts_mapping(tsw_trees[0])
     for t in tsw_trees:
         normalize_tree(t, ts2int, norm_strategy, keep_leaves)
     for k in range(len(trees)):
-        DM = all_pairs_matrix(tsw_trees[k], ts2int, mode, postprocessing)
+        DM, WM = all_pairs_matrix(tsw_trees[k], ts2int, mode, postprocessing)
         D = Ds[k]
+        W = Ws[k]
         for i, j in taxon_pairs(taxons):
             iname, jname = taxons[i], taxons[j]
             if i == j:
@@ -153,8 +169,10 @@ def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
                 D.setmask((i, j), 1)
                 continue
             D[i, j] = DM[ts2int[iname], ts2int[jname]]
+            W[i, j] = WM[ts2int[iname], ts2int[jname]]
             D.setmask((i, j), 1)
-    return taxons, matrix_elementwise(taxons, Ds, np.mean)
+            W.setmask((i, j), 1)
+    return taxons, matrix_weightedaverage(taxons, Ds, Ws)
 
 def build_D(trees, mode, postprocessing):
     taxons = ad.get_ts(trees)
@@ -192,9 +210,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     trees = open(args.input, "r").readlines()
     ts_trees = [ts.read_tree_newick(t) for t in trees]
-    if args.renormalize:
-        normalize(ts_trees, args.renormalize, args.eachtree)
-    # print(ts_trees[0].newick())
+    # if args.renormalize:
+    normalize(ts_trees)
     taxa, D = build_D2([to_newick(t) for t in ts_trees], args.weighting, args.postprocessing, args.strategy, args.renormalize)
     T = run_iterations(taxa, D, "s")
     if args.output == "-":

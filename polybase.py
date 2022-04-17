@@ -11,6 +11,7 @@ import asterid as astrid
 import os
 import sys
 from math import exp
+import numpy as np
 
 def normalize_length(tree, normalize_leaf):
     max_length = max(calc_length(n) for n in tree.traverse_internal() if not n.is_root())
@@ -28,7 +29,7 @@ def normalize_length(tree, normalize_leaf):
             n.edge_length = float(n.edge_length) / max_length
 
 
-def normalize(trees, normalize_leaf = False, each_tree = False):
+def normalize(trees):
     maximum_value = 1
     max_length = -1
     for t in trees:
@@ -37,26 +38,32 @@ def normalize(trees, normalize_leaf = False, each_tree = False):
                 maximum_value = max(maximum_value, float(n.label))
             if not n.is_root():
                 max_length = max(max_length, calc_length(n))
-    if max_length < 0:
-        assert False
-    if each_tree:
-        for t in trees:
-            normalize_length(t, normalize_leaf)
-    else:
-        for t in trees:
-            for n in t.traverse_internal():
-                if n.edge_length:
-                    n.edge_length = float(n.edge_length) / max_length
-            if normalize_leaf:
-                for n in t.traverse_leaves():
-                    n.edge_length = 1
-                else:
-                    n.edge_length = float(n.edge_length) / max_length
-    if maximum_value > 1:
-        for t in trees:
-            for n in t.traverse_internal():
-                if n.label:
+    # if max_length < 0:
+    #     assert False
+    # if each_tree:
+    #     for t in trees:
+    #         normalize_length(t, normalize_leaf)
+    # else:
+    #     for t in trees:
+    #         for n in t.traverse_internal():
+    #             if n.edge_length:
+    #                 n.edge_length = float(n.edge_length) / max_length
+    #         if normalize_leaf:
+    #             for n in t.traverse_leaves():
+    #                 n.edge_length = 1
+    #             else:
+    #                 n.edge_length = float(n.edge_length) / max_length
+    for t in trees:
+        for n in t.traverse_internal():
+            if n.label:
+                if maximum_value > 1:
                     n.label = float(n.label) / 100
+                n.label = (float(n.label) - 0.333) / 0.667
+    # if maximum_value > 1:
+    #     for t in trees:
+    #         for n in t.traverse_internal():
+    #             if n.label:
+    #                 n.label = float(n.label) / 100
 
 def all_matrices(ts, trees):
     return [ad.DistanceMatrix(ts, t) for t in trees]
@@ -104,6 +111,27 @@ def run_iterations(ts, D, methods):
         t = f(ts, D)
         D.fill_in_transient(ts, t)
     return t
+
+def matrix_weightedaverage(ts, Ds, Ws):
+    R = ad.DistanceMatrix(ts)
+    for i, j in taxon_pairs(ts):
+        if i == j:
+            R[i, j] = 0
+            R.setmask((i, j), len(Ds))
+            continue
+        l = []
+        w = []
+        for D, W in zip(Ds, Ws):
+            if D.has(i, j):
+                l.append(D[i, j])
+                w.append(W[i, j])
+        if l:
+            R[i, j] = np.average(l, weights=w)
+            R.setmask((i, j), len(l))
+        else:
+            R[i, j] = 0
+            R.setmask((i, j), 0)
+    return R
 
 def matrix_elementwise(ts, Ds, f):
     R = ad.DistanceMatrix(ts)
