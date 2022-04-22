@@ -1,4 +1,5 @@
 from math import fsum
+from tkinter import X
 from numpy import exp, log
 from polybase import *
 
@@ -127,9 +128,7 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing, ct_mat = None, ct_norma
                             u_acc = calc_support(c)
                         elif postprocessing == "was":
                             u_acc = calc_support(c) * calc_length(c)
-                        elif postprocessing == "naive":
-                            u_acc = calc_length(c)
-                        elif postprocessing == "msc":
+                        else:
                             u_acc = calc_length(c)
                         leaf_dists[c][i][1] = (dist + 1, u + u_acc, v + calc_weight(c, mode))
             for c1 in range(0,len(node.children)-1):
@@ -156,14 +155,24 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing, ct_mat = None, ct_norma
                                     weight = l / estimated
                             elif postprocessing == "naive":
                                 weight = exp(-l)
+                            elif postprocessing == "naive2":
+                                n = ct_normalizer#[tu, tv]
+                                if n <= 0:
+                                    n = 1
+                                weight = exp(-l/n)
+                                # if weight == 0:
+                                #     print(l, ct_normalizer[tu, tv])
+                                # print(weight, exp(-l))
                             elif postprocessing == "msc":
-                                n = ct_normalizer[tu, tv]
+                                n = ct_normalizer#[tu, tv]
                                 if n <= 0:
                                     n = 1
                                 cu = (l - ct_mat[tu, tv]) / n
                                 cu = max(cu, 0)
-                                # assert cu >= 0, f"{cu} {l} {ct_mat[tu, tv]} {ct_normalizer[tu, tv]}"
-                                # print(cu)
+                                weight = exp(-cu)
+                            elif postprocessing == "msc2":
+                                cu = (l - ct_mat[tu, tv])
+                                cu = max(cu, 0)
                                 weight = exp(-cu)
                             D[tu, tv] = estimated
                             D[tv, tu] = estimated
@@ -221,6 +230,16 @@ def get_ts_mapping(tree):
         result[t.label] = i
     return result
 
+def median_of_means(arr, buckets):
+    """compute the median of means of arr with number of buckets"""
+    np.random.shuffle(arr)
+    buckets = np.array_split(arr, buckets)
+    # Compute the mean within each bucket
+    b_means = [np.mean(x) for x in buckets]
+    # Compute the median-of-means
+    median = np.median(np.array(b_means))
+    return median
+
 def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
     taxons = ad.get_ts(trees)
     Ds = all_matrices(taxons, trees)
@@ -234,7 +253,8 @@ def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
     minDis = None
     avgDis = None
     rateNorm = None
-    if postprocessing == 'msc':
+    rateMed = None
+    if postprocessing in ['msc', 'msc2', 'naive2']:
         minDis = np.zeros((N, N))
         avgDis = np.zeros((N, N))
         first_element = True
@@ -249,8 +269,14 @@ def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
                 minDis = np.minimum(minDis, dis_mat)
         avgDis /= len(tsw_trees)
         rateNorm = (avgDis - minDis) / 2
+        rates = []
+        for i in range(N):
+            for j in range(i+1,N):
+                rates.append(rateNorm[i,j])
+        rateMed = median_of_means(np.asarray(rates), 10)
+        # print("rateMed:", rateMed, " ", np.mean(rates), " ", np.median(rates))
     for k in range(len(trees)):
-        DM, WM = all_pairs_matrix(tsw_trees[k], ts2int, mode, postprocessing, minDis, rateNorm)
+        DM, WM = all_pairs_matrix(tsw_trees[k], ts2int, mode, postprocessing, minDis, rateMed)
         D = Ds[k]
         W = Ws[k]
         for i, j in taxon_pairs(taxons):
@@ -261,7 +287,6 @@ def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
                 continue
             D[i, j] = DM[ts2int[iname], ts2int[jname]]
             W[i, j] = WM[ts2int[iname], ts2int[jname]]
-            # print(WM)
             D.setmask((i, j), 1)
             W.setmask((i, j), 1)
     return taxons, matrix_weightedaverage(taxons, Ds, Ws)
