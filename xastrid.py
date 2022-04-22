@@ -51,7 +51,60 @@ def postprocess(prodsupp, weight, mode):
     if mode == "m":
         return prodsupp * weight
 
-def all_pairs_matrix(tree, ts2int, mode, postprocessing):
+
+# def pseudoglass(tree, ts2int):
+#     N = len(ts2int)
+#     D = np.zeros((N, N)) # the average coalescence time matrix
+#     leaf_dists = dict()
+#     for node in tree.traverse_postorder():
+#         if node.is_leaf():
+#             leaf_dists[node] = [[node,(0, 0, 0)]]
+#         else:
+#             calculated_root = False
+#             for c in node.children:
+#                 if c.edge_length is not None:
+#                     if node.is_root() and node.num_children() == 2:
+#                         if calculated_root:
+#                             continue
+#                         calculated_root = True
+#                     for i in range(len(leaf_dists[c])):
+#                         dist, u, v = leaf_dists[c][i][1]
+#                         u_acc = 0
+#                         leaf_dists[c][i][1] = (dist + 1, u + u_acc, v + calc_length(c))
+#             for c1 in range(0,len(node.children)-1):
+#                 leaves_c1 = leaf_dists[node.children[c1]]
+#                 for c2 in range(c1+1,len(node.children)):
+#                     leaves_c2 = leaf_dists[node.children[c2]]
+#                     for i in range(len(leaves_c1)):
+#                         for j in range(len(leaves_c2)):
+#                             u, (ub, ul, ud) = leaves_c1[i]
+#                             v, (vb, vl, vd) = leaves_c2[j]
+#                             l, d = (ul + vl, ud + vd)
+#                             u_key = u.label
+#                             v_key = v.label
+#                             estimated = d
+#                             weight = 1
+#                             if postprocessing == "as":
+#                                 weight = l / (ub + vb)
+#                             elif postprocessing == "was":
+#                                 if estimated <= 0:
+#                                     weight = 0
+#                                 else:
+#                                     weight = l / estimated
+#                             elif postprocessing == "naive":
+#                                 weight = exp(-l)
+#                             tu = ts2int[u_key]
+#                             tv = ts2int[v_key]
+#                             D[tu, tv] = estimated
+#                             D[tv, tu] = estimated
+#                             W[tu, tv] = weight
+#                             W[tv, tu] = weight
+#             leaf_dists[node] = leaf_dists[node.children[0]]; del leaf_dists[node.children[0]]
+#             for i in range(1,len(node.children)):
+#                 leaf_dists[node] += leaf_dists[node.children[i]]; del leaf_dists[node.children[i]]
+#     return D, W
+
+def all_pairs_matrix(tree, ts2int, mode, postprocessing, ct_mat = None, ct_normalizer = None):
     N = len(ts2int)
     D = np.zeros((N, N))
     W = np.zeros((N, N))
@@ -74,6 +127,10 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing):
                             u_acc = calc_support(c)
                         elif postprocessing == "was":
                             u_acc = calc_support(c) * calc_length(c)
+                        elif postprocessing == "naive":
+                            u_acc = calc_length(c)
+                        elif postprocessing == "msc":
+                            u_acc = calc_length(c)
                         leaf_dists[c][i][1] = (dist + 1, u + u_acc, v + calc_weight(c, mode))
             for c1 in range(0,len(node.children)-1):
                 leaves_c1 = leaf_dists[node.children[c1]]
@@ -88,6 +145,8 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing):
                             v_key = v.label
                             estimated = d
                             weight = 1
+                            tu = ts2int[u_key]
+                            tv = ts2int[v_key]
                             if postprocessing == "as":
                                 weight = l / (ub + vb)
                             elif postprocessing == "was":
@@ -95,8 +154,17 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing):
                                     weight = 0
                                 else:
                                     weight = l / estimated
-                            tu = ts2int[u_key]
-                            tv = ts2int[v_key]
+                            elif postprocessing == "naive":
+                                weight = exp(-l)
+                            elif postprocessing == "msc":
+                                n = ct_normalizer[tu, tv]
+                                if n <= 0:
+                                    n = 1
+                                cu = (l - ct_mat[tu, tv]) / n
+                                cu = max(cu, 0)
+                                # assert cu >= 0, f"{cu} {l} {ct_mat[tu, tv]} {ct_normalizer[tu, tv]}"
+                                # print(cu)
+                                weight = exp(-cu)
                             D[tu, tv] = estimated
                             D[tv, tu] = estimated
                             W[tu, tv] = weight
@@ -161,8 +229,28 @@ def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
     ts2int = get_ts_mapping(tsw_trees[0])
     for t in tsw_trees:
         normalize_tree(t, ts2int, norm_strategy, keep_leaves)
+    # initiate the GLASS-like matrices
+    N = len(ts2int)
+    minDis = None
+    avgDis = None
+    rateNorm = None
+    if postprocessing == 'msc':
+        minDis = np.zeros((N, N))
+        avgDis = np.zeros((N, N))
+        first_element = True
+        for tree in tsw_trees:
+            dis_mat, w = all_pairs_matrix(tree, ts2int, 'L', 'i')
+            avgDis += dis_mat
+            # weights += w
+            if first_element:
+                minDis = dis_mat
+                first_element = False
+            else:
+                minDis = np.minimum(minDis, dis_mat)
+        avgDis /= len(tsw_trees)
+        rateNorm = (avgDis - minDis) / 2
     for k in range(len(trees)):
-        DM, WM = all_pairs_matrix(tsw_trees[k], ts2int, mode, postprocessing)
+        DM, WM = all_pairs_matrix(tsw_trees[k], ts2int, mode, postprocessing, minDis, rateNorm)
         D = Ds[k]
         W = Ws[k]
         for i, j in taxon_pairs(taxons):
@@ -173,6 +261,7 @@ def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
                 continue
             D[i, j] = DM[ts2int[iname], ts2int[jname]]
             W[i, j] = WM[ts2int[iname], ts2int[jname]]
+            # print(WM)
             D.setmask((i, j), 1)
             W.setmask((i, j), 1)
     return taxons, matrix_weightedaverage(taxons, Ds, Ws)
@@ -213,8 +302,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     trees = open(args.input, "r").readlines()
     ts_trees = [ts.read_tree_newick(t) for t in trees]
-    # if args.renormalize:
-    normalize(ts_trees)
+    if args.renormalize:
+        normalize(ts_trees)
     taxa, D = build_D2([to_newick(t) for t in ts_trees], args.weighting, args.postprocessing, args.strategy, args.renormalize)
     T = run_iterations(taxa, D, "s")
     if args.output == "-":
