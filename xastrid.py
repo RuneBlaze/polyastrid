@@ -274,7 +274,7 @@ def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
             for j in range(i+1,N):
                 rates.append(rateNorm[i,j])
         rateMed = median_of_means(np.asarray(rates), 10)
-        # print("rateMed:", rateMed, " ", np.mean(rates), " ", np.median(rates))
+        print("rateMed:", rateMed)
     for k in range(len(trees)):
         DM, WM = all_pairs_matrix(tsw_trees[k], ts2int, mode, postprocessing, minDis, rateMed)
         D = Ds[k]
