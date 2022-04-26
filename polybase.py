@@ -184,13 +184,15 @@ def calc_length(node):
         return sum(c.edge_length for c in node.parent.children)
     return node.edge_length
 
-def calc_weight(node, mode = "s"):
+def calc_weight(node, mode = "s",norm=1):
     if mode == 'i':
+        if calc_length(node) <= 0:
+            return 0
         return 1
     if mode == "s":
         return calc_support(node)
     if mode == "l":
-        return 1 - exp(-calc_length(node))
+        return 1 - exp(-calc_length(node)/norm)
     if mode == "L":
         return calc_length(node) # this is dumb
     if mode == "H":

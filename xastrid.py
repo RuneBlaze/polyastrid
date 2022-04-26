@@ -130,7 +130,10 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing, ct_mat = None, ct_norma
                             u_acc = calc_support(c) * calc_length(c)
                         else:
                             u_acc = calc_length(c)
-                        leaf_dists[c][i][1] = (dist + 1, u + u_acc, v + calc_weight(c, mode))
+                        if mode == "nl":
+                            leaf_dists[c][i][1] = (dist + 1, u + u_acc, v + calc_weight(c, "l", ct_normalizer))
+                        else:
+                            leaf_dists[c][i][1] = (dist + 1, u + u_acc, v + calc_weight(c, mode))
             for c1 in range(0,len(node.children)-1):
                 leaves_c1 = leaf_dists[node.children[c1]]
                 for c2 in range(c1+1,len(node.children)):
@@ -160,9 +163,6 @@ def all_pairs_matrix(tree, ts2int, mode, postprocessing, ct_mat = None, ct_norma
                                 if n <= 0:
                                     n = 1
                                 weight = exp(-l/n)
-                                # if weight == 0:
-                                #     print(l, ct_normalizer[tu, tv])
-                                # print(weight, exp(-l))
                             elif postprocessing == "msc":
                                 n = ct_normalizer#[tu, tv]
                                 if n <= 0:
@@ -254,7 +254,7 @@ def build_D2(trees, mode, postprocessing, norm_strategy, keep_leaves):
     avgDis = None
     rateNorm = None
     rateMed = None
-    if postprocessing in ['msc', 'msc2', 'naive2']:
+    if postprocessing in ['msc', 'msc2', 'naive2'] or mode == 'nl':
         minDis = np.zeros((N, N))
         avgDis = np.zeros((N, N))
         first_element = True
